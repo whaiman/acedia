@@ -282,7 +282,7 @@ export default function Home() {
               </div>
 
               {error && (
-                <div className="error-message" style={{ color: "#c00", marginTop: "12px", fontSize: "12px" }}>
+                <div className="error-message">
                   {error}
                 </div>
               )}
@@ -368,7 +368,7 @@ export default function Home() {
                         <span className="detail-label-symbol" aria-hidden="true">↗</span>
                         WHY THIS FIRST
                       </div>
-                      <ul style={{ margin: "10px 0 0 18px", lineHeight: "1.75", color: "#e2e8db", fontSize: "11px" }}>
+                      <ul className="reason-list">
                         {result.result.reason.map((r) => (
                           <li key={r}>{r}</li>
                         ))}
@@ -385,7 +385,7 @@ export default function Home() {
                     {result.result.uncertainty.length > 0 && (
                       <div className="constraint-note uncertainty-note">
                         <div className="constraint-label">UNCERTAINTY</div>
-                        <ul style={{ margin: "0 0 0 18px", color: "#f0e0a0", fontSize: "10px", lineHeight: "1.7" }}>
+                        <ul className="uncertainty-list">
                           {result.result.uncertainty.map((u) => (
                             <li key={u}>{u}</li>
                           ))}
@@ -394,14 +394,14 @@ export default function Home() {
                     )}
 
                     {result.result.deferred.length > 0 && (
-                      <div className="detail-card deferred-section" style={{ marginTop: "16px" }}>
+                      <div className="detail-card deferred-section">
                         <div className="detail-label">
                           <span className="detail-label-symbol" aria-hidden="true">📋</span>
                           OTHER ITEMS
                         </div>
                         <div className="deferred-list">
                           {result.result.deferred.map((d) => (
-                            <div key={d.id} style={{ marginBottom: "8px" }}>{formatDeferred(d)}</div>
+                            <div key={d.id} className="deferred-item-wrapper">{formatDeferred(d)}</div>
                           ))}
                         </div>
                       </div>
@@ -424,16 +424,16 @@ export default function Home() {
                   </>
                 ) : result.result.kind === "needs-info" ? (
                   <div className="empty-state" aria-live="polite">
-                    <div className="empty-symbol" aria-hidden="true" style={{ background: "rgb(232 184 77 / 10%)", borderColor: "#e8b84d", color: "#e8b84d" }}>
+                    <div className="empty-symbol empty-symbol-warning" aria-hidden="true">
                       ?
                     </div>
                     <h3>Need more information</h3>
                     <p>{result.result.question}</p>
-                    <p style={{ marginTop: "12px", color: "#adbcaa" }}>{result.result.reason}</p>
+                    <p className="needs-info-reason">{result.result.reason}</p>
                   </div>
                 ) : (
                   <div className="empty-state" aria-live="polite">
-                    <div className="empty-symbol" aria-hidden="true" style={{ background: "rgb(177 221 171 / 15%)", borderColor: "#b1ddab", color: "#b1ddab" }}>
+                    <div className="empty-symbol empty-symbol-success" aria-hidden="true">
                       ✓
                     </div>
                     <h3>All done!</h3>

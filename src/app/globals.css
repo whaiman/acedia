@@ -878,6 +878,51 @@ textarea:focus-visible {
   font-size: 7px;
 }
 
+.error-message {
+  color: #c00;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.reason-list {
+  margin: 10px 0 0 18px;
+  line-height: 1.75;
+  color: #e2e8db;
+  font-size: 11px;
+}
+
+.uncertainty-list {
+  margin: 0 0 0 18px;
+  color: #f0e0a0;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.deferred-section {
+  margin-top: 16px;
+}
+
+.deferred-item-wrapper {
+  margin-bottom: 8px;
+}
+
+.empty-symbol-warning {
+  background: rgb(232 184 77 / 10%);
+  border-color: #e8b84d;
+  color: #e8b84d;
+}
+
+.needs-info-reason {
+  margin-top: 12px;
+  color: #adbcaa;
+}
+
+.empty-symbol-success {
+  background: rgb(177 221 171 / 15%);
+  border-color: #b1ddab;
+  color: #b1ddab;
+}
+
 @keyframes reveal {
   from {
     opacity: 0;

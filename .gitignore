@@ -40,4 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ai things
 session-*.md
+.agents
+skills-lock.json

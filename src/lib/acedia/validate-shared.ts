@@ -4,8 +4,27 @@ import { ensureUniqueId } from "./ids";
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const EFFORTS: Effort[] = ["tiny", "small", "medium", "large"];
 
-export const validDate = (s: string) =>
-  ISO.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function getDaysInMonth(year: number, month: number): number {
+  if (month === 2) return isLeapYear(year) ? 29 : 28;
+  return DAYS_IN_MONTH[month - 1];
+}
+
+export const validDate = (s: string) => {
+  if (!ISO.test(s)) return false;
+  const year = Number(s.slice(0, 4));
+  const month = Number(s.slice(5, 7));
+  const day = Number(s.slice(8, 10));
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > getDaysInMonth(year, month)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+};
 
 export interface ValidationContext {
   /** If provided, verify sourceQuote against this text */

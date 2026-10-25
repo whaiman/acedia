@@ -9,7 +9,7 @@ const MONTHS: Record<string, number> = {
   october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12,
 };
 const M = "(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\\.?";
-const PRE = "\\b(?:by|due(?:\\s+on)?|before|until)\\s+(?:the\\s+)?";
+const PRE = "\\b(?:by|due(?:\\s+on)?)\\s+(?:the\\s+)?";
 const RE_ISO = new RegExp(`${PRE}(\\d{4}-\\d{2}-\\d{2})\\b`, "i");
 const RE_DM = new RegExp(`${PRE}(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${M}(?=\\W|$)`, "i");
 const RE_MD = new RegExp(`${PRE}${M}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "i");
@@ -22,20 +22,20 @@ function build(day: number, month: number, today: Date): string | undefined {
   return validDate(iso) ? iso : undefined;
 }
 
-function extractDeadline(sentence: string, today: Date): { deadline?: string; rest: string } {
+function extractDeadline(sentence: string, today: Date): { deadline?: string; matched?: string } {
   let m = sentence.match(RE_ISO);
-  if (m && validDate(m[1])) return { deadline: m[1], rest: sentence.replace(m[0], "") };
+  if (m && validDate(m[1])) return { deadline: m[1], matched: m[0] };
   m = sentence.match(RE_DM);
   if (m) {
     const d = build(Number(m[1]), MONTHS[m[2].toLowerCase()], today);
-    if (d) return { deadline: d, rest: sentence.replace(m[0], "") };
+    if (d) return { deadline: d, matched: m[0] };
   }
   m = sentence.match(RE_MD);
   if (m) {
     const d = build(Number(m[2]), MONTHS[m[1].toLowerCase()], today);
-    if (d) return { deadline: d, rest: sentence.replace(m[0], "") };
+    if (d) return { deadline: d, matched: m[0] };
   }
-  return { rest: sentence };
+  return {};
 }
 
 /**
@@ -47,15 +47,36 @@ export function parseText(text: string, today: Date): Obligation[] {
   const existingIds = new Set<string>();
   const items: Obligation[] = [];
   const deps: string[][] = [];
+  const EFFORT_REGEX = /\b(?:effort|size)\s*[:=]\s*(tiny|small|medium|large)\b/i;
+  const IRREVERSIBLE_REGEX = /\b(?:irreversible|permanent|final|cannot be undone|can't be undone)\b/i;
   for (const rawLine of text.split("\n")) {
     const line = rawLine.trim().replace(/^([-*•]|\d+[.)])\s+/, "");
     if (!line) continue;
     for (const sentence of line.split(/(?<=[.!?])\s+(?=[A-Z0-9])/)) {
       const quote = sentence.trim().replace(/[\s]+$/, "");
       if (!quote) continue;
-      const { deadline, rest } = extractDeadline(quote, today);
+      const { deadline, matched } = extractDeadline(quote, today);
+      let body = quote;
+      if (matched) {
+        body = body.replace(matched, "");
+      }
+
+      // Extract effort
+      let effort: "tiny" | "small" | "medium" | "large" | undefined;
+      const effortMatch = body.match(EFFORT_REGEX);
+      if (effortMatch) {
+        effort = effortMatch[1].toLowerCase() as "tiny" | "small" | "medium" | "large";
+        body = body.replace(EFFORT_REGEX, "");
+      }
+
+      // Extract irreversible
+      let irreversible = false;
+      if (IRREVERSIBLE_REGEX.test(body)) {
+        irreversible = true;
+        body = body.replace(IRREVERSIBLE_REGEX, "");
+      }
+
       let names: string[] = [];
-      let body = rest;
       const a = body.match(/\b(?:after|needs|depends on)\s+(.+)$/i);
       if (a) {
         names = a[1].split(/,|\band\b/i).map((s) => s.replace(/[.!?]+$/, "").trim()).filter(Boolean);
@@ -64,13 +85,15 @@ export function parseText(text: string, today: Date): Obligation[] {
       const title = body.replace(/[\s,;.!?]+$/, "").replace(/\s{2,}/g, " ").trim();
       if (!title) continue;
       const id = nextObligationId(existingIds);
-      items.push({ id, title, deadline, dependsOn: [], sourceQuote: quote });
+      items.push({ id, title, deadline, dependsOn: [], sourceQuote: quote, effort, irreversible });
       deps.push(names);
     }
   }
   items.forEach((o, i) => {
     o.dependsOn = deps[i].map((n) => {
-      const hit = items.find((p) => p !== o && p.title.toLowerCase().includes(n.toLowerCase()));
+      const escaped = n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`\\b${escaped}\\b`, "i");
+      const hit = items.find((p) => p !== o && regex.test(p.title));
       return hit ? hit.id : `unresolved:${n}`;
     });
   });
@@ -81,16 +104,8 @@ export type ValidationResult =
   | { ok: true; obligations: Obligation[]; warnings: string[] }
   | { ok: false; error: string };
 
-/**
- * Validates untrusted (model) output against the user's original text.
- * Copies only known fields. Rejects malformed structure rather than repairing it.
- * A deadline survives only if its sourceQuote really occurs in the user's text.
- */
 export function validateProposal(raw: unknown, sourceText: string): ValidationResult {
   const result = validateObligationStructure(raw, { sourceText });
   if (!result.ok) return result;
-  // validateObligationStructure returns the full obligation with all fields,
-  // but validateProposal only returns specific fields (no sourceQuote in output for some reason?)
-  // Actually looking at the original, it does include sourceQuote. Let's keep the result as-is.
   return result;
 }
