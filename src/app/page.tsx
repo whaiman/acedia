@@ -61,6 +61,25 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
+  // Initialize dark mode from localStorage or system preference
+  useEffect(() => {
+    const stored = localStorage.getItem("acedia-theme");
+    if (stored) {
+      setIsDark(stored === "dark");
+      document.documentElement.classList.toggle("dark", stored === "dark");
+    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      setIsDark(true);
+      document.documentElement.classList.add("dark");
+    }
+  }, []);
+
+  // Persist dark mode preference
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+    localStorage.setItem("acedia-theme", isDark ? "dark" : "light");
+  }, [isDark]);
 
   // Generate dynamic examples on mount (client-side only)
   useEffect(() => {
@@ -196,6 +215,15 @@ export default function Home() {
         <div className="sidebar-bottom">
           <span className="sidebar-status-dot" />
           <span>LOCAL</span>
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setIsDark((prev) => !prev)}
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            title={isDark ? "Light mode" : "Dark mode"}
+          >
+            {isDark ? "☀️" : "🌙"}
+          </button>
         </div>
       </aside>
 
