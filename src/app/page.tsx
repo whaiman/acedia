@@ -1,21 +1,45 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, useEffect } from "react";
 import Link from "next/link";
-import "./globals.css";
+import { exampleScenarios } from "@/lib/acedia/examples";
 
-type ObligationResult = {
-  action: string;
-  completion: string;
-  rationale: string;
-  deadlineNote: string;
-  source: string;
+type EngineResult =
+  | { kind: "action"; obligationId: string; title: string; action: string; doneWhen: string; reason: string[]; deadlineNote?: string; deferred: DeferredItem[]; uncertainty: string[] }
+  | { kind: "needs-info"; question: string; reason: string }
+  | { kind: "all-done" };
+
+type DeferredItem =
+  | { kind: "waiting"; id: string; title: string; reason: string; reviewWhen: string }
+  | { kind: "safe"; id: string; title: string; reason: string; reviewAt: string; reconsiderIf: string }
+  | { kind: "not-justified"; id: string; title: string; reason: string };
+
+type Obligation = {
+  id: string;
+  title: string;
+  deadline?: string;
+  dependsOn: string[];
+  effort?: "tiny" | "small" | "medium" | "large";
+  irreversible?: boolean;
+  firstStep?: string;
+  doneWhen?: string;
+  sourceQuote?: string;
+  done?: boolean;
+};
+
+type CompileResponse = {
+  obligations: Obligation[];
+  result: EngineResult;
+  today: string;
+  usedModel: boolean;
+  warnings: string[];
+  model?: string;
 };
 
 const DEFAULT_TASK =
   "I need to submit a university report by Friday. I have notes, but no structure yet.";
 
-const EXAMPLES = [
+const STATIC_EXAMPLES = [
   {
     label: "University report",
     text: DEFAULT_TASK,
@@ -30,114 +54,129 @@ const EXAMPLES = [
   },
 ];
 
-function compileObligation(input: string): ObligationResult {
-  const text = input.trim();
-  const normalized = text.toLocaleLowerCase();
-
-  let action: string;
-  let completion: string;
-  let rationale: string;
-
-  if (
-    /(submit|submission|send|deliver|turn in|hand in|сдать|отправить|подать|представить|подача)/i.test(
-      normalized,
-    )
-  ) {
-    action =
-      "Find the official submission requirements and list what must be delivered.";
-    completion =
-      "A checklist names the required format, materials, submission channel, and exact deadline.";
-    rationale =
-      "This clarifies what “done” means before you spend time polishing the work.";
-  } else if (
-    /(customs|paperwork|document|application|passport|tax|form|parcel|заявлен|документ|паспорт|тамож|налог|анкета|справк|посылк)/i.test(
-      normalized,
-    )
-  ) {
-    action =
-      "Confirm the exact document list with the authority handling the procedure.";
-    completion =
-      "You have a checklist of required documents, where each requirement came from, and what is still missing.";
-    rationale =
-      "Confirming the requirements first reduces the risk of making a wasted trip or preparing the wrong documents.";
-  } else if (
-    /(code|bug|feature|implement|develop|software|program|repository|код|ошибк|функци|разработ|программ|репозитор)/i.test(
-      normalized,
-    )
-  ) {
-    action =
-      "Define one observable behaviour and identify the smallest place to implement it.";
-    completion =
-      "One sentence describes the expected behaviour, and one relevant file or module is identified.";
-    rationale =
-      "A small, testable slice is easier to implement and verify than an entire feature at once.";
-  } else if (
-    /(report|essay|article|lecture|study|exam|write|notes|report|учить|экзамен|лекци|конспект|отч[её]т|стат[ьи]|написать|подготов)/i.test(
-      normalized,
-    )
-  ) {
-    action = "Create a rough outline with three to five section headings.";
-    completion =
-      "The document has a title and three to five headings. No polishing is required yet.";
-    rationale =
-      "An outline makes the work visible and gives you a structure to fill in one section at a time.";
-  } else {
-    action = "Write one sentence describing the finished outcome.";
-    completion =
-      "One sentence states the expected result and a condition that proves the task is finished.";
-    rationale =
-      "Making the outcome observable is the smallest step from a vague obligation to actionable work.";
-  }
-
-  const deadlineMentioned =
-    /\b(today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|deadline|due|asap)\b|сегодня|завтра|дедлайн|срок|до\s+\w+/i.test(
-      normalized,
-    );
-
-  return {
-    action,
-    completion,
-    rationale,
-    deadlineNote: deadlineMentioned
-      ? "Deadline language was found. Confirm the exact date; this prototype does not calculate dates."
-      : "No explicit deadline was detected. Add one if timing affects priority.",
-    source: text.length > 150 ? `${text.slice(0, 147).trimEnd()}…` : text,
-  };
-}
-
 export default function Home() {
+  const [dynamicExamples, setDynamicExamples] = useState<typeof STATIC_EXAMPLES>([]);
   const [task, setTask] = useState(DEFAULT_TASK);
-  const [result, setResult] = useState<ObligationResult | null>(() =>
-    compileObligation(DEFAULT_TASK),
-  );
-  const [resultMode, setResultMode] = useState<"example" | "compiled">(
-    "example",
-  );
+  const [result, setResult] = useState<CompileResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
 
-  function handleCompile(event: FormEvent<HTMLFormElement>) {
+  // Generate dynamic examples on mount (client-side only)
+  useEffect(() => {
+    const today = new Date();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDynamicExamples(exampleScenarios(today));
+  }, []);
+
+  const EXAMPLES = [...STATIC_EXAMPLES, ...dynamicExamples];
+
+  async function handleCompile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!task.trim()) return;
 
-    setResult(compileObligation(task));
-    setResultMode("compiled");
+    setIsLoading(true);
+    setError(null);
     setIsComplete(false);
+
+    try {
+      const res = await fetch("/api/compile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: task }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to compile");
+      }
+
+      const data = await res.json();
+      setResult(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleMarkComplete() {
+    if (!result || result.result.kind !== "action") return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Call the engine locally via API to get next recommendation
+      // We send the updated obligations with the completed one marked as done
+      const completedId = result.result.obligationId;
+      const updatedObligations = result.obligations.map((o) =>
+        o.id === completedId ? { ...o, done: true } : o
+      );
+
+      const res = await fetch("/api/compile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: task, obligations: updatedObligations }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to get next step");
+      }
+
+      const data = await res.json();
+      setResult(data);
+      setIsComplete(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function handleTaskChange(value: string) {
     setTask(value);
     setResult(null);
+    setError(null);
     setIsComplete(false);
-    setResultMode("compiled");
   }
 
   function loadExample(example: (typeof EXAMPLES)[number]) {
     setTask(example.text);
     setResult(null);
+    setError(null);
     setIsComplete(false);
-    setResultMode("compiled");
   }
+
+  function formatDeferred(d: DeferredItem): React.ReactNode {
+    switch (d.kind) {
+      case "waiting":
+        return (
+          <span className="deferred-item deferred-waiting">
+            <span className="deferred-badge">WAITING</span>
+            <span>{d.title} — {d.reason} (review: {d.reviewWhen})</span>
+          </span>
+        );
+      case "safe":
+        return (
+          <span className="deferred-item deferred-safe">
+            <span className="deferred-badge">SAFE</span>
+            <span>{d.title} — {d.reason} (reconsider by {d.reviewAt})</span>
+          </span>
+        );
+      case "not-justified":
+        return (
+          <span className="deferred-item deferred-not-justified">
+            <span className="deferred-badge">NOT JUSTIFIED</span>
+            <span>{d.title} — {d.reason}</span>
+          </span>
+        );
+    }
+  }
+
+  const modelName = result?.model ? result.model.split("/").pop() || result.model : null;
 
   return (
     <div className="app-shell">
@@ -149,14 +188,8 @@ export default function Home() {
         <div className="sidebar-divider" />
 
         <div className="sidebar-nav" aria-label="Current section">
-          <div
-            className="nav-item nav-item-active"
-            aria-current="page"
-            title="Compiler"
-          >
-            <span className="nav-icon" aria-hidden="true">
-              ↳
-            </span>
+          <div className="nav-item nav-item-active" aria-current="page" title="Compiler">
+            <span className="nav-icon" aria-hidden="true">↳</span>
           </div>
         </div>
 
@@ -176,6 +209,12 @@ export default function Home() {
 
           <div className="local-pill">
             <span className="status-dot" />
+            {result?.usedModel && modelName ? (
+              <>
+                <span className="model-badge">MODEL: {modelName}</span>
+                <span className="local-pill-separator">/</span>
+              </>
+            ) : null}
             LOCAL PROTOTYPE
           </div>
         </header>
@@ -222,6 +261,7 @@ export default function Home() {
                 placeholder="Describe the task, the deadline, or the requirements you have to deal with..."
                 rows={7}
                 required
+                disabled={isLoading}
               />
 
               <div className="examples">
@@ -233,6 +273,7 @@ export default function Home() {
                       type="button"
                       className="example-button"
                       onClick={() => loadExample(example)}
+                      disabled={isLoading}
                     >
                       {example.label}
                     </button>
@@ -240,23 +281,42 @@ export default function Home() {
                 </div>
               </div>
 
+              {error && (
+                <div className="error-message" style={{ color: "#c00", marginTop: "12px", fontSize: "12px" }}>
+                  {error}
+                </div>
+              )}
+
               <div className="editor-footer">
                 <div className="privacy-note">
                   <span className="status-dot" />
-                  <span>Processed in this browser</span>
+                  <span>
+                    {result?.usedModel ? `LLM: ${modelName}` : "Processed locally (rule-based)"}
+                    {result && !result.usedModel && result.warnings.some(w => w.includes("Model failed")) && (
+                      <span className="fallback-badge"> ⚠ Model unavailable — using simple parser</span>
+                    )}
+                  </span>
                 </div>
 
                 <button
                   className="compile-button"
                   type="submit"
-                  disabled={!task.trim()}
+                  disabled={!task.trim() || isLoading}
                 >
-                  <span>Compile obligation</span>
-                  <span className="button-arrow" aria-hidden="true">
-                    ↗
-                  </span>
+                  <span>{isLoading ? "Compiling…" : "Compile obligation"}</span>
+                  <span className="button-arrow" aria-hidden="true">↗</span>
                 </button>
               </div>
+
+              {isLoading && (
+                <div className="loading-indicator">
+                  <div className="loading-spinner" aria-hidden="true" />
+                  <span className="loading-text">Compiling…</span>
+                  {result?.warnings?.length && (
+                    <span className="loading-warning">⚠ {result.warnings[0]}</span>
+                  )}
+                </div>
+              )}
             </form>
           </section>
 
@@ -271,71 +331,126 @@ export default function Home() {
 
             {result ? (
               <div className="result-content" aria-live="polite">
-                <div className="result-topline">
-                  <span className="result-mode">
-                    {resultMode === "example"
-                      ? "EXAMPLE OUTPUT"
-                      : "RULE-BASED OUTPUT"}
-                  </span>
+                {result.result.kind === "action" ? (
+                  <>
+                    <div className="result-topline">
+                      <span className="result-mode">
+                        {result.usedModel ? `LLM + ENGINE` : "ENGINE OUTPUT"}
+                      </span>
 
-                  <span
-                    className={`priority-badge ${isComplete ? "priority-badge-complete" : ""}`}
-                  >
-                    <span className="priority-dot" />
-                    {isComplete ? "COMPLETED" : "START HERE"}
-                  </span>
-                </div>
+                      <span
+                        className={`priority-badge ${isComplete ? "priority-badge-complete" : ""}`}
+                      >
+                        <span className="priority-dot" />
+                        {isComplete ? "COMPLETED" : "START HERE"}
+                      </span>
+                    </div>
 
-                <h3 className={`action-title ${isComplete ? "action-title-complete" : ""}`}>
-                  {result.action}
-                </h3>
+                    <h3 className={`action-title ${isComplete ? "action-title-complete" : ""}`}>
+                      {result.result.action}
+                    </h3>
 
-                <div className="focus-hint">
-                  <span className="focus-hint-symbol" aria-hidden="true">
-                    ↳
-                  </span>
-                  ONE STEP. THEN REASSESS.
-                </div>
+                    <div className="focus-hint">
+                      <span className="focus-hint-symbol" aria-hidden="true">↳</span>
+                      ONE STEP. THEN REASSESS.
+                    </div>
 
-                <div className="detail-card">
-                  <div className="detail-label">
-                    <span className="detail-label-symbol" aria-hidden="true">
+                    <div className="detail-card">
+                      <div className="detail-label">
+                        <span className="detail-label-symbol" aria-hidden="true">✓</span>
+                        DONE WHEN
+                      </div>
+                      <p>{result.result.doneWhen}</p>
+                    </div>
+
+                    <div className="detail-card">
+                      <div className="detail-label">
+                        <span className="detail-label-symbol" aria-hidden="true">↗</span>
+                        WHY THIS FIRST
+                      </div>
+                      <ul style={{ margin: "10px 0 0 18px", lineHeight: "1.75", color: "#e2e8db", fontSize: "11px" }}>
+                        {result.result.reason.map((r) => (
+                          <li key={r}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {result.result.deadlineNote && (
+                      <div className="constraint-note">
+                        <div className="constraint-label">CONSTRAINT CHECK</div>
+                        <p>{result.result.deadlineNote}</p>
+                      </div>
+                    )}
+
+                    {result.result.uncertainty.length > 0 && (
+                      <div className="constraint-note uncertainty-note">
+                        <div className="constraint-label">UNCERTAINTY</div>
+                        <ul style={{ margin: "0 0 0 18px", color: "#f0e0a0", fontSize: "10px", lineHeight: "1.7" }}>
+                          {result.result.uncertainty.map((u) => (
+                            <li key={u}>{u}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {result.result.deferred.length > 0 && (
+                      <div className="detail-card deferred-section" style={{ marginTop: "16px" }}>
+                        <div className="detail-label">
+                          <span className="detail-label-symbol" aria-hidden="true">📋</span>
+                          OTHER ITEMS
+                        </div>
+                        <div className="deferred-list">
+                          {result.result.deferred.map((d) => (
+                            <div key={d.id} style={{ marginBottom: "8px" }}>{formatDeferred(d)}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="source-context">
+                      <div className="source-label">BASED ON YOUR INPUT</div>
+                      <blockquote>“{task.length > 150 ? `${task.slice(0, 147).trimEnd()}…` : task}”</blockquote>
+                    </div>
+
+                    <button
+                      type="button"
+                      className={`complete-button ${isComplete ? "complete-button-done" : ""}`}
+                      onClick={handleMarkComplete}
+                      disabled={isComplete || isLoading}
+                    >
+                      <span>{isLoading ? "Getting next step…" : isComplete ? "Step completed" : "Mark step complete"}</span>
+                      <span aria-hidden="true">{isComplete ? "✓" : "→"}</span>
+                    </button>
+                  </>
+                ) : result.result.kind === "needs-info" ? (
+                  <div className="empty-state" aria-live="polite">
+                    <div className="empty-symbol" aria-hidden="true" style={{ background: "rgb(232 184 77 / 10%)", borderColor: "#e8b84d", color: "#e8b84d" }}>
+                      ?
+                    </div>
+                    <h3>Need more information</h3>
+                    <p>{result.result.question}</p>
+                    <p style={{ marginTop: "12px", color: "#adbcaa" }}>{result.result.reason}</p>
+                  </div>
+                ) : (
+                  <div className="empty-state" aria-live="polite">
+                    <div className="empty-symbol" aria-hidden="true" style={{ background: "rgb(177 221 171 / 15%)", borderColor: "#b1ddab", color: "#b1ddab" }}>
                       ✓
-                    </span>
-                    DONE WHEN
+                    </div>
+                    <h3>All done!</h3>
+                    <p>No open obligations remain.</p>
                   </div>
-                  <p>{result.completion}</p>
-                </div>
+                )}
 
-                <div className="detail-card">
-                  <div className="detail-label">
-                    <span className="detail-label-symbol" aria-hidden="true">
-                      ↗
-                    </span>
-                    WHY THIS FIRST
-                  </div>
-                  <p>{result.rationale}</p>
+                <div className="output-footer">
+                  <span className="output-footer-dot" />
+                  <span>{result.usedModel ? `LLM: ${modelName} → ` : ""}ENGINE: parseText + recommend</span>
+                  {result.warnings.length > 0 && (
+                    <>
+                      <span className="output-footer-separator">/</span>
+                      <span className="output-warning">⚠ {result.warnings[0]}</span>
+                    </>
+                  )}
                 </div>
-
-                <div className="constraint-note">
-                  <div className="constraint-label">CONSTRAINT CHECK</div>
-                  <p>{result.deadlineNote}</p>
-                </div>
-
-                <div className="source-context">
-                  <div className="source-label">BASED ON YOUR INPUT</div>
-                  <blockquote>“{result.source}”</blockquote>
-                </div>
-
-                <button
-                  type="button"
-                  className={`complete-button ${isComplete ? "complete-button-done" : ""}`}
-                  onClick={() => setIsComplete(true)}
-                  disabled={isComplete}
-                >
-                  <span>{isComplete ? "Step completed" : "Mark step complete"}</span>
-                  <span aria-hidden="true">{isComplete ? "✓" : "→"}</span>
-                </button>
               </div>
             ) : (
               <div className="empty-state" aria-live="polite">
@@ -352,13 +467,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-
-            <div className="output-footer">
-              <span className="output-footer-dot" />
-              <span>RULE-BASED PROTOTYPE</span>
-              <span className="output-footer-separator">/</span>
-              <span>NO AI MODEL CONNECTED</span>
-            </div>
           </section>
         </div>
 
