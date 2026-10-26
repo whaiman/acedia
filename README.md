@@ -40,19 +40,19 @@ npm start
 
 The app works fully offline with the rule-based parser. Configure these environment variables to enable LLM-powered obligation extraction:
 
-| Variable                | Required             | Description                                                                                                            |
-| ----------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `ACEDIA_LLM_BASE_URL`   | For LLM mode         | OpenAI-compatible base URL (e.g., `http://127.0.0.1:1234/v1` for LM Studio, `https://api.groq.com/openai/v1` for Groq) |
-| `ACEDIA_LLM_MODEL`      | For LLM mode         | Model identifier as shown in your server (e.g., `google/gemma-4-e2b`, `qwen/qwen3-32b`)                                |
-| `ACEDIA_LLM_API_KEY`    | If provider requires | Bearer token for the inference API (LM Studio usually doesn't need one)                                                |
-| `ACEDIA_LLM_TIMEOUT_MS` | Optional             | Request timeout in milliseconds (default: 120000)                                                                      |
+| Variable | Required | Description |
+| ---------- | ---------- | ------------- |
+| `ACEDIA_LLM_BASE_URL` | For LLM mode | OpenAI-compatible base URL (e.g., `http://127.0.0.1:1234/v1` for LM Studio, `https://api.groq.com/openai/v1` for Groq) |
+| `ACEDIA_LLM_MODEL` | For LLM mode | Model identifier as shown in your server (e.g., `google/gemma-4-e2b`, `qwen/qwen3-32b`) |
+| `ACEDIA_LLM_API_KEY` | If provider requires | Bearer token for the inference API (LM Studio usually doesn't need one) |
+| `ACEDIA_LLM_TIMEOUT_MS` | Optional | Request timeout in milliseconds (default: 120000) |
 
 Create a `.env` file in the project root:
 
 ```bash
 # Example for LM Studio (local)
 ACEDIA_LLM_BASE_URL=http://127.0.0.1:1234/v1
-ACEDIA_LLM_MODEL=google/gemma-4-e2b
+ACEDIA_LLM_MODEL=your-model-id
 
 # Example for Groq (cloud)
 # ACEDIA_LLM_BASE_URL=https://api.groq.com/openai/v1
@@ -164,7 +164,7 @@ Debug endpoint — LLM extraction only, no prioritization. Requires LLM config.
 - **Rule-based parser** doesn't understand relative dates like "Friday", "next week", "in 3 days", or non-English month names
 - **No persistence** — refresh loses all state
 - **Single-user demo** — in-memory rate limiting resets on server restart
-- **LLM fallback** — if the model is slow/unavailable, the app silently falls back to the rule-based parser (shown via a warning badge)
+- **LLM fallback** — if the model is slow or unavailable, the app falls back to the rule-based parser and displays a warning badge
 - **Prompt injection protection** reduces risk but doesn't guarantee safety
 - **No authentication, no database, no audit log** — intended as a local-first prototype
 
