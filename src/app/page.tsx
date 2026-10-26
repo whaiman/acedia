@@ -235,7 +235,8 @@ export default function Home() {
           <span className="deferred-item deferred-safe">
             <span className="deferred-badge">SAFE</span>
             <span>
-              {d.title} — {d.reason} (reconsider by {d.reviewAt})
+              {d.title} — {d.reason} (review on {d.reviewAt}; reconsider if{" "}
+              {d.reconsiderIf})
             </span>
           </span>
         );
