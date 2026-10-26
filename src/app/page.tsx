@@ -250,7 +250,12 @@ export default function Home() {
         );
     }
   }
-
+  const current = result?.result;
+  const action = current && current.kind === "action" ? current : null;
+  const chosen =
+    action && result
+      ? result.obligations.find((o) => o.id === action.obligationId)
+      : undefined;
   const modelName = result?.model
     ? result.model.split("/").pop() || result.model
     : null;
@@ -541,9 +546,10 @@ export default function Home() {
                       <div className="source-label">BASED ON YOUR INPUT</div>
                       <blockquote>
                         “
-                        {task.length > 150
-                          ? `${task.slice(0, 147).trimEnd()}…`
-                          : task}
+                        {chosen?.sourceQuote ??
+                          (task.length > 150
+                            ? `${task.slice(0, 147).trimEnd()}…`
+                            : task)}
                         ”
                       </blockquote>
                     </div>
