@@ -421,7 +421,7 @@ export default function Home() {
                 <div className="loading-indicator">
                   <div className="loading-spinner" aria-hidden="true" />
                   <span className="loading-text">Compiling…</span>
-                  {result?.warnings?.length && (
+                  {result && result.warnings.length > 0 && (
                     <span className="loading-warning">
                       ⚠ {result.warnings[0]}
                     </span>
