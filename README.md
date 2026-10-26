@@ -66,6 +66,21 @@ ACEDIA_LLM_MODEL=google/gemma-4-e2b
 2. Set the three variables above in your hosting platform (Render, Vercel, etc.)
 3. The app will automatically use Groq for obligation extraction
 
+### Privacy in the public demo
+
+When cloud LLM extraction is enabled, task text submitted to Acedia
+is sent to the configured model provider for processing. This can
+happen even if the request later falls back to the rule-based parser.
+
+Do not submit passwords, API keys, sensitive personal information,
+or confidential work. Acedia does not persist task state in an
+application database, but this does not guarantee that the hosting
+platform or model provider retains no logs. Review their respective
+privacy and data-retention policies before using the public demo.
+
+When no LLM is configured, Acedia uses its rule-based parser without
+calling an external LLM.
+
 ### Using a local inference server (LM Studio, llama.cpp, vLLM, Ollama)
 
 1. Start your server with an OpenAI-compatible `/v1/chat/completions` endpoint
