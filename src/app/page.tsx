@@ -222,7 +222,7 @@ export default function Home() {
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             title={isDark ? "Light mode" : "Dark mode"}
           >
-            {isDark ? "☀️" : "🌙"}
+            <span aria-hidden="true">{isDark ? "○" : "●"}</span>
           </button>
         </div>
       </aside>
@@ -254,9 +254,8 @@ export default function Home() {
           </div>
 
           <h1>
-            Make the next step
-            <br />
-            <span>impossible to misunderstand.</span>
+            <span className="hero-line">Make the next step</span>
+            <span className="hero-line hero-line-accent">impossible to misunderstand.</span>
           </h1>
 
           <p className="hero-description">
@@ -332,7 +331,7 @@ export default function Home() {
                   disabled={!task.trim() || isLoading}
                 >
                   <span>{isLoading ? "Compiling…" : "Compile obligation"}</span>
-                  <span className="button-arrow" aria-hidden="true">↗</span>
+                  <span className="button-arrow" aria-hidden="true">↓</span>
                 </button>
               </div>
 
@@ -424,7 +423,7 @@ export default function Home() {
                     {result.result.deferred.length > 0 && (
                       <div className="detail-card deferred-section">
                         <div className="detail-label">
-                          <span className="detail-label-symbol" aria-hidden="true">📋</span>
+                          <span className="detail-label-symbol" aria-hidden="true">≡</span>
                           OTHER ITEMS
                         </div>
                         <div className="deferred-list">
