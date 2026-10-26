@@ -1317,3 +1317,9 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+.privacy-disclosure {
+  margin: 12px 0 0;
+  color: #737d73;
+  font-size: 10px;
+  line-height: 1.6;
+}

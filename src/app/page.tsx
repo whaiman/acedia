@@ -390,9 +390,11 @@ export default function Home() {
                 <div className="privacy-note">
                   <span className="status-dot" />
                   <span>
-                    {result?.usedModel
+                    {result?.usedModel && modelName
                       ? `LLM: ${modelName}`
-                      : "Processed locally (rule-based)"}
+                      : result
+                        ? "Rule-based parser"
+                        : "Ready to compile"}
                     {result &&
                       !result.usedModel &&
                       result.warnings.some((w) =>
@@ -405,6 +407,11 @@ export default function Home() {
                       )}
                   </span>
                 </div>
+                <p className="privacy-disclosure">
+                  Public demo: do not enter passwords, API keys, or sensitive
+                  personal information. When cloud LLM extraction is enabled,
+                  your text is sent to the configured provider for processing.
+                </p>
 
                 <button
                   className="compile-button"
