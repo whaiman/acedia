@@ -36,12 +36,12 @@ npm start
 
 The app works fully offline with the rule-based parser. Configure these environment variables to enable LLM-powered obligation extraction:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ACEDIA_LLM_BASE_URL` | For LLM mode | OpenAI-compatible base URL (e.g., `http://127.0.0.1:1234/v1` for LM Studio, `https://api.groq.com/openai/v1` for Groq) |
-| `ACEDIA_LLM_MODEL` | For LLM mode | Model identifier as shown in your server (e.g., `google/gemma-4-e2b`, `qwen/qwen3-32b`) |
-| `ACEDIA_LLM_API_KEY` | If provider requires | Bearer token for the inference API (LM Studio usually doesn't need one) |
-| `ACEDIA_LLM_TIMEOUT_MS` | Optional | Request timeout in milliseconds (default: 120000) |
+| Variable                | Required             | Description                                                                                                            |
+| ----------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `ACEDIA_LLM_BASE_URL`   | For LLM mode         | OpenAI-compatible base URL (e.g., `http://127.0.0.1:1234/v1` for LM Studio, `https://api.groq.com/openai/v1` for Groq) |
+| `ACEDIA_LLM_MODEL`      | For LLM mode         | Model identifier as shown in your server (e.g., `google/gemma-4-e2b`, `qwen/qwen3-32b`)                                |
+| `ACEDIA_LLM_API_KEY`    | If provider requires | Bearer token for the inference API (LM Studio usually doesn't need one)                                                |
+| `ACEDIA_LLM_TIMEOUT_MS` | Optional             | Request timeout in milliseconds (default: 120000)                                                                      |
 
 Create a `.env` file in the project root:
 
@@ -67,23 +67,27 @@ ACEDIA_LLM_MODEL=google/gemma-4-e2b
 1. Start your server with an OpenAI-compatible `/v1/chat/completions` endpoint
 2. Set `ACEDIA_LLM_BASE_URL` to your server's base URL (include `/v1`)
 3. Set `ACEDIA_LLM_MODEL` to the model name as shown in your server
-3. No API key needed for most local servers
+4. No API key needed for most local servers
 
 ## How it works
 
 ### 1. Obligation extraction (optional LLM)
+
 - If an LLM is configured, the user's text is sent to an OpenAI-compatible `/chat/completions` endpoint with `temperature=0` and `response_format=json_object`
 - **Prompt injection protection**: System prompt explicitly forbids following embedded instructions; user notes are wrapped in `--- USER NOTES START/END ---` delimiters; input is sanitized (control chars removed, backticks escaped, length capped)
 - Model output is **validated** against the original text: every `sourceQuote` must appear verbatim; unverified deadlines are dropped; only known fields are kept
 
 ### 2. Rule-based parser (fallback / offline)
+
 - One obligation per line or sentence
 - Understands ISO dates (`2026-10-30`), "30 October", "October 30", and rolls far-past dates to next year
 - Parses `after X and Y` dependencies
 - Does NOT understand "Friday", "next week", or implicit dependencies
 
 ### 3. Deterministic priority engine (`recommend`)
+
 Pure function. Rules, in order:
+
 1. Only items with no open prerequisites can be chosen
 2. Urgent first: effective deadline overdue or within 2 days
 3. Enablers first: more open items waiting on it
@@ -93,6 +97,7 @@ Pure function. Rules, in order:
 7. Original input order
 
 **Deferral categories:**
+
 - `waiting` — blocked on unmet dependencies
 - `safe` — effective deadline ≥ 7 days away, not irreversible, has a known deadline
 - `not-justified` — no deadline, irreversible, or deadline too close (< 7 days)
@@ -100,12 +105,15 @@ Pure function. Rules, in order:
 **The engine never marks an obligation as `safe` to defer merely because a model says so.** Safety is decided solely by verified deadlines and dependency structure.
 
 ### 4. Mark complete → next recommendation
+
 Clicking "Mark step complete" sends the updated obligation list (with the chosen item marked `done: true`) back to `/api/compile`, which re-runs `recommend` and returns the next action. No database — completely stateless.
 
 ## API
 
 ### `POST /api/compile`
+
 Main endpoint. Accepts:
+
 ```json
 {
   "text": "string (1–4000 chars, required)",
@@ -114,6 +122,7 @@ Main endpoint. Accepts:
 ```
 
 Returns:
+
 ```json
 {
   "obligations": Obligation[],
@@ -128,6 +137,7 @@ Returns:
 **Rate limit:** 30 requests/minute per IP (in-memory, single-instance demo only). Returns `429` with `Retry-After` header when exceeded. **Not distributed, not persistent, not production-grade.**
 
 ### `POST /api/interpret`
+
 Debug endpoint — LLM extraction only, no prioritization. Requires LLM config.
 
 ## Known limitations
