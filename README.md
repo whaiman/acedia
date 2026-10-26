@@ -2,6 +2,10 @@
 
 Turn a pile of obligations, tasks, deadlines, and dependencies into **one justified next action** with a finish line, a reason, and a list of what can safely wait.
 
+Acedia takes its name from Ancient Greek ἀκηδία (*akēdía*), commonly translated as “lack of care” or “indifference.” Here, it describes the state in which obligations pile up until starting any one of them becomes difficult.
+
+The goal is not to motivate harder, but to make the next action clear.
+
 ## Core idea
 
 1. **Describe** what you need to do in plain text (deadlines, dependencies, constraints).
