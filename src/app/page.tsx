@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, type FormEvent, useEffect } from "react";
+import {
+  useState,
+  useEffect,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import Link from "next/link";
 import { exampleScenarios } from "@/lib/acedia/examples";
 
@@ -77,6 +82,40 @@ const STATIC_EXAMPLES = [
   },
 ];
 
+const THEME_KEY = "acedia-theme";
+const themeListeners = new Set<() => void>();
+
+function readIsDark(): boolean {
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored) return stored === "dark";
+  } catch {
+    /* storage unavailable */
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+function subscribeTheme(onChange: () => void) {
+  themeListeners.add(onChange);
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    themeListeners.delete(onChange);
+    mq.removeEventListener("change", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function setTheme(dark: boolean) {
+  try {
+    localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
+  } catch {
+    /* ignore */
+  }
+  themeListeners.forEach((l) => l());
+}
+
 export default function Home() {
   const [dynamicExamples, setDynamicExamples] = useState<
     typeof STATIC_EXAMPLES
@@ -86,24 +125,10 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useSyncExternalStore(subscribeTheme, readIsDark, () => false);
 
-  // Initialize dark mode from localStorage or system preference
-  useEffect(() => {
-    const stored = localStorage.getItem("acedia-theme");
-    if (stored) {
-      setIsDark(stored === "dark");
-      document.documentElement.classList.toggle("dark", stored === "dark");
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      setIsDark(true);
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
-
-  // Persist dark mode preference
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
-    localStorage.setItem("acedia-theme", isDark ? "dark" : "light");
   }, [isDark]);
 
   // Generate dynamic examples on mount (client-side only)
@@ -261,7 +286,7 @@ export default function Home() {
           <button
             type="button"
             className="theme-toggle"
-            onClick={() => setIsDark((prev) => !prev)}
+            onClick={() => setTheme(!isDark)}
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             title={isDark ? "Light mode" : "Dark mode"}
           >
